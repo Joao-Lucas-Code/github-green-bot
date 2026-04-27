@@ -1,22 +1,6 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/vercel_handler.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "api/vercel_handler.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "api/vercel_handler.py"
-    }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
   ]
 }

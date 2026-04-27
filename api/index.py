@@ -1,191 +1,100 @@
-"""
-API Server para Green Bot - Suporta Render e Vercel.
-
-Endpoints:
-- GET / - Health check
-- GET /api/commit - Executa o commit via GitHub API
-- POST /api/commit - Executa o commit via GitHub API (mais seguro)
-"""
-
+from flask import Flask, jsonify
 import os
-import sys
-from pathlib import Path
+import random
+import datetime
+from github import Github
 
-# Adiciona o diretório pai ao path para importar commit_bot
-sys.path.insert(0, str(Path(__file__).parent.parent))
+app = Flask(__name__)
 
-from commit_bot import GreenBot
+@app.route("/")
+def index():
+    return jsonify({
+        "status": "ok",
+        "message": "Green Bot API esta rodando! 🚀",
+        "endpoints": {
+            "/": "Health check",
+            "/api/commit": "Executa commit diario (GET/POST)"
+        }
+    })
 
-
-def handler(request, response=None):
-    """
-    Handler universal que funciona em Vercel (serverless) e WSGI.
+@app.route("/api/commit", methods=["GET", "POST"])
+def api_commit():
+    token = os.getenv("GITHUB_TOKEN")
+    username = os.getenv("GITHUB_USERNAME")
+    repo_name = os.getenv("REPO_NAME", "github-green-bot")
     
-    Args:
-        request: Dict (Vercel) ou objeto Request (WSGI)
-        response: Opcional, para frameworks WSGI
-    
-    Returns:
-        Dict para Vercel, ou string/response para WSGI
-    """
-    # Detecta se é Vercel (passa dict) ou WSGI
-    is_vercel = isinstance(request, dict)
-    
-    # Obtém o método HTTP
-    if is_vercel:
-        method = request.get("method", "GET")
-        path = request.get("path", "/")
-    else:
-        method = getattr(request, "method", "GET")
-        path = getattr(request, "path", "/") or "/"
-    
-    # Health check
-    if path == "/" and method == "GET":
-        return _json_response({
-            "status": "ok",
-            "message": "Green Bot API está rodando! 🚀",
-            "endpoints": {
-                "/": "Health check",
-                "/api/commit": "Executa commit diário (GET/POST)"
-            }
-        }, is_vercel)
-    
-    # Commit endpoint
-    if path in ["/api/commit", "/api/commit/"] and method in ["GET", "POST"]:
-        return _execute_commit(is_vercel)
-    
-    # 404
-    return _json_response({
-        "status": "error",
-        "message": "Endpoint não encontrado"
-    }, is_vercel, status=404)
-
-
-def _execute_commit(is_vercel: bool):
-    """Executa o bot e retorna resposta JSON."""
-    # Configura para modo API
-    os.environ["USE_API"] = "true"
-    
-    # Verifica variáveis obrigatórias
-    required = ["GITHUB_TOKEN", "GITHUB_USERNAME", "REPO_NAME"]
-    missing = [var for var in required if not os.getenv(var)]
-    
-    if missing:
-        return _json_response({
+    if not token or not username:
+        missing = []
+        if not token: missing.append("GITHUB_TOKEN")
+        if not username: missing.append("GITHUB_USERNAME")
+        return jsonify({
             "status": "error",
-            "message": f"Variáveis de ambiente faltando: {', '.join(missing)}"
-        }, is_vercel, status=500)
+            "message": f"Variaveis faltando: {', '.join(missing)}"
+        }), 500
     
     try:
-        bot = GreenBot()
-        success = bot.run()
+        g = Github(token)
+        repo = g.get_repo(f"{username}/{repo_name}")
         
-        if success:
-            return _json_response({
-                "status": "success",
-                "message": "🟩 Commit diário realizado com sucesso!",
-                "timestamp": str(__import__('datetime').datetime.now())
-            }, is_vercel)
+        now = datetime.datetime.now()
+        facts = [
+            "Python foi criado em 1991 por Guido van Rossum.",
+            "O primeiro commit do Linux foi feito em 1991.",
+            "GitHub foi fundado em 2008 e comprado pela Microsoft em 2018.",
+            "VS Code e o editor mais popular entre desenvolvedores.",
+            "O termo 'bug' veio de uma mariposa encontrada em um computador em 1947.",
+            "JavaScript foi criado em 10 dias por Brendan Eich.",
+            "O mascot do Python e uma cobra, mas o nome vem do Monty Python.",
+        ]
+        fact = random.choice(facts)
+        
+        content = f"""# 📊 Atividade Diaria - Green Bot
+
+**Data:** {now.strftime("%d/%m/%Y %H:%M:%S")}
+**Dia da semana:** {now.strftime("%A")}
+
+---
+
+> {fact}
+
+---
+
+*Gerado automaticamente em {now.strftime("%d/%m/%Y")}*"""
+        content += f"\n<!-- random: {random.randint(1000, 9999)} -->\n"
+        
+        file_path = "activity.md"
+        try:
+            existing_file = repo.get_contents(file_path)
+            sha = existing_file.sha
+        except:
+            sha = None
+        
+        messages = [
+            "Daily contribution: keeping the streak alive 🔥",
+            "Consistency is key 🚀",
+            "Another day, another commit 💻",
+            "GitHub streak +1 📈",
+            "Pixel verde conquistado hoje 🟩",
+        ]
+        msg = random.choice(messages)
+        
+        if sha:
+            repo.update_file(path=file_path, message=msg, content=content, sha=sha)
         else:
-            return _json_response({
-                "status": "error",
-                "message": "❌ Falha ao realizar commit"
-            }, is_vercel, status=500)
-            
+            repo.create_file(path=file_path, message=msg, content=content)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"🟩 Commit realizado: {msg}",
+            "timestamp": str(datetime.datetime.now())
+        })
+        
     except Exception as e:
-        return _json_response({
+        return jsonify({
             "status": "error",
             "message": f"Erro: {str(e)}"
-        }, is_vercel, status=500)
+        }), 500
 
-
-def _json_response(data: dict, is_vercel: bool, status: int = 200):
-    """Retorna resposta JSON no formato correto para Vercel ou WSGI."""
-    if is_vercel:
-        return {
-            "statusCode": status,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
-            "body": __import__('json').dumps(data)
-        }
-    else:
-        # Para frameworks WSGI como Flask
-        from flask import jsonify
-        response = jsonify(data)
-        response.status_code = status
-        return response
-
-
-# ============================================================================
-# WSGI App (para Render/Gunicorn/Flask)
-# ============================================================================
-
-try:
-    from flask import Flask, request as flask_request, jsonify
-    
-    app = Flask(__name__)
-    
-    @app.route("/", methods=["GET"])
-    def index():
-        return jsonify({
-            "status": "ok",
-            "message": "Green Bot API está rodando! 🚀",
-            "endpoints": {
-                "/": "Health check",
-                "/api/commit": "Executa commit diário (GET/POST)"
-            }
-        })
-    
-    @app.route("/api/commit", methods=["GET", "POST"])
-    def api_commit():
-        os.environ["USE_API"] = "true"
-        
-        required = ["GITHUB_TOKEN", "GITHUB_USERNAME", "REPO_NAME"]
-        missing = [var for var in required if not os.getenv(var)]
-        
-        if missing:
-            return jsonify({
-                "status": "error",
-                "message": f"Variáveis faltando: {', '.join(missing)}"
-            }), 500
-        
-        try:
-            bot = GreenBot()
-            success = bot.run()
-            
-            if success:
-                return jsonify({
-                    "status": "success",
-                    "message": "🟩 Commit diário realizado com sucesso!",
-                    "timestamp": str(__import__('datetime').datetime.now())
-                })
-            else:
-                return jsonify({
-                    "status": "error",
-                    "message": "❌ Falha ao realizar commit"
-                }), 500
-                
-        except Exception as e:
-            return jsonify({
-                "status": "error",
-                "message": f"Erro: {str(e)}"
-            }), 500
-    
-    @app.route("/health", methods=["GET"])
-    def health():
-        return jsonify({"status": "healthy"})
-
-except ImportError:
-    app = None
-    print("⚠️  Flask não instalado. Usando modo serverless apenas.")
-
-
-# ============================================================================
-# Vercel Entry Point
-# ============================================================================
-
-def vercel_handler(request):
-    """Entry point específico para Vercel serverless functions."""
-    return handler(request)
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "healthy"})
