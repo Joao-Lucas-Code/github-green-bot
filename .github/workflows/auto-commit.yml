@@ -1,0 +1,47 @@
+name: 🤖 Green Bot - Daily Commit
+
+on:
+  schedule:
+    # Roda todo dia às 9:00 BRT (12:00 UTC)
+    - cron: '0 12 * * *'
+    # Backup: roda às 21:00 BRT também (00:00 UTC)
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Permite rodar manualmente pelo GitHub
+
+permissions:
+  contents: write
+
+jobs:
+  daily-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout do repositório
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: 📦 Instalar dependências
+        run: pip install PyGithub
+        
+      - name: 🤖 Executar Green Bot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_USERNAME: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          USE_API: "false"
+        run: python commit_bot.py
+        
+      - name: ✅ Log de sucesso
+        if: success()
+        run: echo "🟩 Commit diário realizado com sucesso!"
+        
+      - name: ❌ Log de falha
+        if: failure()
+        run: echo "❌ Falha ao realizar commit diário"
