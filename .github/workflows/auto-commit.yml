@@ -2,12 +2,11 @@ name: 🤖 Green Bot - Daily Commit
 
 on:
   schedule:
-    # Roda todo dia às 9:00 BRT (12:00 UTC)
-    - cron: '0 12 * * *'
-    # Backup: roda às 21:00 BRT também (00:00 UTC)
-    - cron: '0 0 * * *'
+    # 3 horários para redundância (BRT = UTC-3):
+    - cron: '0 9 * * *'   # 06:00 BRT (manhã)
+    - cron: '0 12 * * *'  # 09:00 BRT (primary)
+    - cron: '0 18 * * *'  # 15:00 BRT (tarde)
   workflow_dispatch:
-    # Permite rodar manualmente pelo GitHub
 
 permissions:
   contents: write
@@ -15,22 +14,38 @@ permissions:
 jobs:
   daily-commit:
     runs-on: ubuntu-latest
-    
     steps:
       - name: 📥 Checkout do repositório
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          
+      - name: 🔍 Verificar se já existe commit hoje
+        id: check
+        run: |
+          LAST_COMMIT_DATE=$(git log -1 --format=%cd --date=short)
+          TODAY=$(date +%Y-%m-%d)
+          if [ "$LAST_COMMIT_DATE" = "$TODAY" ]; then
+            echo "✅ Commit de hoje ($TODAY) já existe. Pulando."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "🤖 Nenhum commit hoje ($TODAY). Executando bot..."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
           
       - name: 🐍 Setup Python
+        if: steps.check.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           
       - name: 📦 Instalar dependências
+        if: steps.check.outputs.skip == 'false'
         run: pip install PyGithub
         
       - name: 🤖 Executar Green Bot
+        if: steps.check.outputs.skip == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_USERNAME: ${{ github.repository_owner }}
@@ -39,9 +54,9 @@ jobs:
         run: python commit_bot.py
         
       - name: ✅ Log de sucesso
-        if: success()
+        if: steps.check.outputs.skip == 'false' && success()
         run: echo "🟩 Commit diário realizado com sucesso!"
         
       - name: ❌ Log de falha
-        if: failure()
+        if: steps.check.outputs.skip == 'false' && failure()
         run: echo "❌ Falha ao realizar commit diário"
