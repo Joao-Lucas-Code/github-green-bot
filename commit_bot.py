@@ -2,6 +2,7 @@
 """
 GitHub Green Bot - Automacao de commits diarios para manter o perfil verde.
 """
+
 import os
 import sys
 import json
@@ -18,6 +19,7 @@ try:
 except ImportError:
     _GITHUB_LIB_AVAILABLE = False
 
+
 class GreenBot:
     COMMIT_MESSAGES = [
         "Daily contribution: keeping the streak alive 🔥",
@@ -31,6 +33,8 @@ class GreenBot:
         "GitHub streak +1 📈",
         "Contribuicao diaria registrada 📝",
         "Codigo todo dia traz mastery closer 🧠",
+        "Hoje: {date} - commit realizado com sucesso",
+        "Progresso silencioso, resultado barulhento 📊",
         "Mantendo o ritmo de aprendizado 📚",
         "1% melhor que ontem 📐",
         "Dev journey continues... 🛤️",
@@ -109,8 +113,10 @@ Commit automatico gerado pelo Green Bot para manter a consistencia de contribuic
         try:
             print("🤖 Iniciando Green Bot (Git Mode)...")
             
-            subprocess.run(["git", "config", "user.email", "green-bot@users.noreply.github.com"], check=True)
-            subprocess.run(["git", "config", "user.name", "Green Bot"], check=True)
+            git_email = os.getenv("GIT_USER_EMAIL", "green-bot@users.noreply.github.com")
+            git_name = os.getenv("GIT_USER_NAME", "Green Bot")
+            subprocess.run(["git", "config", "user.email", git_email], check=True)
+            subprocess.run(["git", "config", "user.name", git_name], check=True)
             
             content = self._generate_daily_content()
             activity_file = Path("activity.md")
@@ -186,10 +192,12 @@ Commit automatico gerado pelo Green Bot para manter a consistencia de contribuic
             return self.run_api_mode()
         return self.run_git_mode()
 
+
 def main():
     bot = GreenBot()
     success = bot.run()
     sys.exit(0 if success else 1)
+
 
 if __name__ == "__main__":
     main()
