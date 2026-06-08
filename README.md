@@ -31,7 +31,7 @@ Ideal para quem estuda, trabalha e quer manter constância visível no perfil, s
 ├───────────────────────────────────────────────────────────────┤
 │                                                                │
 │   🥇 CAMADA 1 — GitHub Actions (Primary)                       │
-│      Cron nativo • 2 execuções/dia • Zero custo               │
+│      Cron nativo • 1 execução/dia • Zero custo               │
 │      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━              │
 │                                                                │
 │   🥈 CAMADA 2 — Render Web Service (Backup 1)                  │
